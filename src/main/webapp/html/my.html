@@ -1,11 +1,409 @@
-<html>
+<html lang="ru">
 <head>
     <title>RPG</title>
     <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link href="/css/my.css" rel="stylesheet">
 </head>
-<body>
-<h1>RPG admin panel</h1>
+<body style="background-attachment: fixed">
+    <h1>RPG admin panel</h1>
+    <h2>Accounts list:</h2>
+    <div class="accountPerPage">
+        <span>Count per page: </span>
+        <select id="page_size" name="pageSize" onchange="getCurrentPageSize(this)">
+            <option value="3">3</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+        </select>
+    </div>
+    <table id="accounts_list" class="table table-dark table-bordered"></table>
+    <div id="pages"></div>
+    <div id="creator" style="margin-bottom: 30px">
+        <hr style="display: block; height: 2px; background-color: black; opacity: 70%">
+        <h2>Create new account:</h2>
+        <form onsubmit="createAccount();return false" name="createAccountForm">
+            <div class="w-25">
+                <label class="fw-bolder" for="nameForCreate">Name:</label>
+                <input class="form-control bg-dark text-light opacity-75" type="text" id="nameForCreate" name="nameForCreate" minlength="1" maxlength="12">
+            </div>
+            <div class="w-25">
+                <label class="fw-bolder" for="titleForCreate">Title:</label>
+                <input class="form-control bg-dark text-light opacity-75" type="text" id="titleForCreate" name="titleForCreate" minlength="1" maxlength="30">
+            </div>
+            <div class="w-25">
+                <label class="fw-bolder" for="raceForCreate">Race:</label>
+                <select class="form-control bg-dark text-light opacity-75" id="raceForCreate" name="raceForCreate">
+                    <option value="HUMAN">HUMAN</option>
+                    <option value="DWARF">DWARF</option>
+                    <option value="ELF">ELF</option>
+                    <option value="GIANT">GIANT</option>
+                    <option value="ORC">ORC</option>
+                    <option value="TROLL">TROLL</option>
+                    <option value="HOBBIT">HOBBIT</option>
+                </select>
+            </div>
+            <div class="w-25">
+                <label class="fw-bolder" for="professionForCreate">Profession:</label>
+                <select class="form-control bg-dark text-light opacity-75" id="professionForCreate" name="professionForCreate">
+                    <option value="WARRIOR">WARRIOR</option>
+                    <option value="ROGUE">ROGUE</option>
+                    <option value="SORCERER">SORCERER</option>
+                    <option value="CLERIC">CLERIC</option>
+                    <option value="PALADIN">PALADIN</option>
+                    <option value="NAZGUL">NAZGUL</option>
+                    <option value="WARLOCK">WARLOCK</option>
+                    <option value="DRUID">DRUID</option>
+                </select>
+            </div>
+            <div class="w-25">
+                <label class="fw-bolder" for="levelForCreate">Level:</label>
+                <input class="form-control bg-dark text-light opacity-75" type="number" id="levelForCreate" name="levelForCreate" min="0" max="100">
+            </div>
+            <div class="w-25">
+                <label class="fw-bolder" for="birthdayForCreate">Birthday:</label>
+                <input class="form-control bg-dark text-light opacity-75" type="date" id="birthdayForCreate" name="birthdayForCreate" min="2000-01-01" max="3000-12-31">
+            </div>
+            <div class="w-25">
+                <label class="fw-bolder" for="isBannedForCreate">Banned:</label>
+                <select class="form-control bg-dark text-light opacity-75" id="isBannedForCreate" name="isBannedForCreate">
+                    <option value="false">false</option>
+                    <option value="true">true</option>
+                </select>
+            </div>
+            <div class="w-25">
+                <input class="btn btn-light w-100 mt-4 opacity-75" type="submit" value="Save">
+            </div>
+        </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
+    </script>
+    <script>
+        // получение кол-ва аккаунтов
+        // расчет количества страниц
+        let playersCountRequest = new XMLHttpRequest();
+        playersCountRequest.open("GET", "/rest/players/count");
+        let playersCount;
+        let pageSizeSelector = document.getElementById("page_size");
+        let pageSize = pageSizeSelector.options[pageSizeSelector.selectedIndex].value;
+        let pagesCount;
+        let pageNumber = "0";
+        playersCountRequest.onload = function (){
+            playersCount = playersCountRequest.response;
+            pagesCount = Math.ceil(playersCount / pageSize);
+            createPageButtons(pagesCount);
+            showCurrentPageAccounts();
+        }
+        playersCountRequest.send();
 
+        // выбор количества персонажей на странице
+        function getCurrentPageSize(select) {
+            pageSize = pageSizeSelector.options[pageSizeSelector.selectedIndex].value;
+            pagesCount = Math.ceil(playersCount / pageSize);
+            createPageButtons(pagesCount);
+            showCurrentPageAccounts();
+        }
+
+        // удаление аккаунта
+        function deleteAccount(elem) {
+            let idValue = elem.parentNode.firstChild.textContent;
+            let deleteAccountRequest = new XMLHttpRequest();
+            deleteAccountRequest.open("DELETE", `/rest/players/${idValue}`);
+            deleteAccountRequest.onload = function () {
+                if (deleteAccountRequest.status === 200) {
+                    createPageButtons(pagesCount);
+                    showCurrentPageAccounts();
+                } else if (deleteAccountRequest.status === 404) {
+                    console.error("Player is not found");
+                } else if (deleteAccountRequest.status === 400) {
+                    console.error("ID value is not valid");
+                }
+            }
+            deleteAccountRequest.send();
+        }
+
+        // редактирование аккаунта
+        function editAccount(elem) {
+            let children = elem.parentNode.children;
+
+            let id = children[0].textContent;
+
+            let currentName = children[1].textContent;
+            children[1].innerHTML = '<input class="form-control bg-light text-dark" type="text" id="name" name="name"/>'
+            let nameInput = children[1].getElementsByTagName("input")[0];
+            nameInput.setAttribute("value", `${currentName}`);
+            let newName;
+            nameInput.onchange = function () {
+                newName = nameInput.value;
+            }
+
+            let currentTitle = children[2].textContent;
+            children[2].innerHTML = '<input class="form-control bg-light text-dark" type="text" id="title" name="title"/>'
+            let titleInput = children[2].getElementsByTagName("input")[0];
+            titleInput.setAttribute("value", `${currentTitle}`);
+            let newTitle;
+            titleInput.onchange = function () {
+                newTitle = titleInput.value;
+            }
+
+            let currentRace = children[3].textContent;
+            children[3].innerHTML = '<select class="form-control bg-light text-dark" id="race" name="race">' +
+                '<option value="HUMAN">HUMAN</option>' +
+                '<option value="DWARF">DWARF</option>' +
+                '<option value="ELF">ELF</option>' +
+                '<option value="GIANT">GIANT</option>' +
+                '<option value="ORC">ORC</option>' +
+                '<option value="TROLL">TROLL</option>' +
+                '<option value="HOBBIT">HOBBIT</option>' +
+                '</select>'
+            let raceOptions = children[3].getElementsByTagName("option");
+            for (let option of raceOptions) {
+                if (option.value === currentRace) {
+                    option.setAttribute("selected", "selected");
+                }
+            }
+            let newRace;
+            let raceSelector = document.getElementById("race");
+            raceSelector.onchange = function () {
+                newRace = raceSelector.options[raceSelector.selectedIndex].value;
+            }
+
+            let currentProfession = children[4].textContent;
+            children[4].innerHTML = '<select class="form-control bg-light text-dark" id="profession" name="profession">' +
+                '<option value="WARRIOR">WARRIOR</option>' +
+                '<option value="ROGUE">ROGUE</option>' +
+                '<option value="SORCERER">SORCERER</option>' +
+                '<option value="CLERIC">CLERIC</option>' +
+                '<option value="PALADIN">PALADIN</option>' +
+                '<option value="NAZGUL">NAZGUL</option>' +
+                '<option value="WARLOCK">WARLOCK</option>' +
+                '<option value="DRUID">DRUID</option>' +
+                '</select>'
+            let professionOptions = children[4].getElementsByTagName("option");
+            for (let option of professionOptions) {
+                if (option.value === currentProfession) {
+                    option.setAttribute("selected", "selected");
+                }
+            }
+            let newProfession;
+            let professionSelector = document.getElementById("profession");
+            professionSelector.onchange = function () {
+                newProfession = professionSelector.options[professionSelector.selectedIndex].value;
+            }
+
+            let currentIsBanned = children[7].textContent;
+            children[7].innerHTML = '<select class="form-control bg-light text-dark" id="is_bunned" name="is_bunned">' +
+                '<option value="false">false</option>' +
+                '<option value="true">true</option>' +
+                '</select>'
+            let bannedOptions = children[7].getElementsByTagName("option");
+            for (let option of bannedOptions) {
+                if (option.value === currentIsBanned) {
+                    option.setAttribute("selected", "selected");
+                }
+            }
+            let newIsBanned;
+            let isBannedSelector = document.getElementById("is_bunned");
+            isBannedSelector.onchange = function () {
+                newIsBanned = isBannedSelector.options[isBannedSelector.selectedIndex].value;
+            }
+
+            elem.innerHTML = '<img onmouseover="this.style.cursor=\'pointer\'" onmouseout="this.style.cursor=\'default\'" width="40" height="40" src="https://proftelecom.by/save1.png" alt="сохранить аккаунт" />';
+
+            children[9].innerHTML = "";
+
+            elem.firstChild.onclick = function () {
+                let editData = {
+                    name: newName,
+                    title: newTitle,
+                    race: newRace,
+                    profession: newProfession,
+                    banned: newIsBanned
+                };
+                let body = JSON.stringify(editData);
+                let editRequest = new XMLHttpRequest();
+                editRequest.open("POST", `rest/players/${id}`);
+                editRequest.setRequestHeader("Content-type", "application/json");
+                editRequest.send(body);
+                editRequest.onload = function () {
+                    if (editRequest.status === 200) {
+                        createPageButtons(pagesCount);
+                        showCurrentPageAccounts();
+                    } else if (editRequest.status === 404) {
+                        console.error("Player is not found");
+                    } else if (editRequest.status === 400) {
+                        console.error("ID value is not valid");
+                    }
+                }
+            }
+        }
+
+        // создание аккаунта
+        function createAccount() {
+            let createName = document.getElementById("nameForCreate").value;
+            let createTitle = document.getElementById("titleForCreate").value;
+            let createRace = document.getElementById("raceForCreate").options[document.getElementById("raceForCreate").selectedIndex].value;
+            let createProfession = document.getElementById("professionForCreate").options[document.getElementById("professionForCreate").selectedIndex].value;
+            let createBirthday = document.getElementById("birthdayForCreate").valueAsNumber
+            let createIsBanned = (document.getElementById("isBannedForCreate").options[document.getElementById("isBannedForCreate").selectedIndex].value === "true");
+            let createLevel = document.getElementById("levelForCreate").valueAsNumber;
+
+            let createData = {
+                name: createName,
+                title: createTitle,
+                race: createRace,
+                profession: createProfession,
+                birthday: createBirthday,
+                banned: createIsBanned,
+                level: createLevel
+            }
+            let body = JSON.stringify(createData);
+            let createRequest = new XMLHttpRequest();
+            createRequest.open("POST", `rest/players`);
+            createRequest.setRequestHeader("Content-type", "application/json");
+            createRequest.send(body);
+            createRequest.onload = function () {
+                if (createRequest.status === 200) {
+                    createPageButtons(pagesCount);
+                    showCurrentPageAccounts();
+                    clearFields();
+                } else if (createRequest.status === 400) {
+                    console.error("Account's data is not valid");
+                }
+            }
+        }
+
+        // очистка полей формы от введенных данных
+        function clearFields(){
+            document.getElementById("nameForCreate").value = "";
+            document.getElementById("titleForCreate").value = "";
+            document.getElementById("raceForCreate").value = "HUMAN";
+            document.getElementById("professionForCreate").value = "WARRIOR";
+            document.getElementById("birthdayForCreate").value = "";
+            document.getElementById("isBannedForCreate").value = "false";
+            document.getElementById("levelForCreate").value = "";
+        }
+
+        // отрисовка кнопок страниц
+        function createPageButtons(pagesCount) {
+            let pageButtonsDiv = document.getElementById("pages");
+            pageButtonsDiv.innerHTML = "";
+            pageButtonsDiv.innerText = "Pages: ";
+            for (let i = 0; i < pagesCount; i++) {
+                let newPageButton = document.createElement("button");
+                newPageButton.textContent = (i + 1).toString();
+                newPageButton.setAttribute("class", "btn btn-dark");
+                newPageButton.setAttribute("style", "opacity: 70%; margin: 5");
+                newPageButton.setAttribute("id", (i).toString());
+                newPageButton.setAttribute("onclick", "getPageNumber(this)");
+                pageButtonsDiv.appendChild(newPageButton);
+            }
+            let currentPage = document.getElementById(pageNumber);
+            currentPage.setAttribute("class", "btn btn-light");
+        }
+
+        // получение номера страницы
+        function getPageNumber(elem) {
+            pageNumber = elem.id;
+            let buttons = elem.parentNode.getElementsByTagName("button");
+            for (let button of buttons) {
+                button.setAttribute("class", "btn btn-dark");
+            }
+            elem.setAttribute("class", "btn btn-light");
+            showCurrentPageAccounts();
+        }
+
+        // отображение списка аккаунтов
+        function showCurrentPageAccounts() {
+            let table = document.getElementById("accounts_list");
+            table.innerHTML = "";
+            let newRow = document.createElement("tr");
+            newRow.setAttribute("style", "background-color:#212529; opacity: 70%");
+            table.appendChild(newRow);
+            let idHeader = document.createElement("th");
+            idHeader.textContent = "#";
+            newRow.appendChild(idHeader);
+            let nameHeader = document.createElement("th");
+            nameHeader.textContent = "Name";
+            newRow.appendChild(nameHeader);
+            let titleHeader = document.createElement("th");
+            titleHeader.textContent = "Title";
+            newRow.appendChild(titleHeader);
+            let raceHeader = document.createElement("th");
+            raceHeader.textContent = "Race";
+            newRow.appendChild(raceHeader);
+            let professionHeader = document.createElement("th");
+            professionHeader.textContent = "Profession";
+            newRow.appendChild(professionHeader);
+            let levelHeader = document.createElement("th");
+            levelHeader.textContent = "Level";
+            newRow.appendChild(levelHeader);
+            let birthdayHeader = document.createElement("th");
+            birthdayHeader.textContent = "Birthday";
+            newRow.appendChild(birthdayHeader);
+            let bannedHeader = document.createElement("th");
+            bannedHeader.textContent = "Banned";
+            newRow.appendChild(bannedHeader);
+            let editHeader = document.createElement("th");
+            editHeader.textContent = "Edit";
+            newRow.appendChild(editHeader);
+            let deleteHeader = document.createElement("th");
+            deleteHeader.textContent = "Delete";
+            newRow.appendChild(deleteHeader);
+
+            let accountRequest = new XMLHttpRequest();
+
+            accountRequest.open("GET", `/rest/players?pageNumber=${pageNumber}&pageSize=${pageSize}`);
+            accountRequest.responseType = "json";
+            accountRequest.onload = function (){
+                let accounts = accountRequest.response;
+                for (let i = 0; i < accounts.length; i++) {
+                    let newRow = document.createElement("tr");
+                    newRow.setAttribute("style", "background-color:#212529; opacity: 70%");
+                    table.appendChild(newRow);
+
+                    let idCell = document.createElement("td");
+                    idCell.textContent = accounts[i].id;
+                    newRow.appendChild(idCell);
+
+                    let nameCell = document.createElement("td");
+                    nameCell.textContent = accounts[i].name;
+                    newRow.appendChild(nameCell);
+
+                    let titleCell = document.createElement("td");
+                    titleCell.textContent = accounts[i].title;
+                    newRow.appendChild(titleCell);
+
+                    let raceCell = document.createElement("td");
+                    raceCell.textContent = accounts[i].race;
+                    newRow.appendChild(raceCell);
+
+                    let professionCell = document.createElement("td");
+                    professionCell.textContent = accounts[i].profession;
+                    newRow.appendChild(professionCell);
+
+                    let levelCell = document.createElement("td");
+                    levelCell.textContent = accounts[i].level;
+                    newRow.appendChild(levelCell);
+
+                    let birthdayCell = document.createElement("td");
+                    birthdayCell.textContent = new Date(accounts[i].birthday).toLocaleDateString();
+                    newRow.appendChild(birthdayCell);
+
+                    let bannedCell = document.createElement("td");
+                    bannedCell.textContent = accounts[i].banned;
+                    newRow.appendChild(bannedCell);
+
+                    let editCell = document.createElement("td");
+                    editCell.innerHTML = '<img onclick="editAccount(this.parentNode)" onmouseover="this.style.cursor=\'pointer\'" onmouseout="this.style.cursor=\'default\'" width="40" height="40" src="https://sun6-21.userapi.com/s/v1/if1/VFAHDbgIeRjBFejzhBKqkHAbDC6Kqm6RhhxfL8crABkaAIO1L3APsjO3z7cOCPanC08EjnwU.jpg?size=50x50&quality=96&crop=99,0,600,600&ava=1" alt="редактировать аккаунт" />';
+                    newRow.appendChild(editCell);
+
+                    let deleteCell = document.createElement("td");
+                    deleteCell.innerHTML = '<img onclick="deleteAccount(this.parentNode)" onmouseover="this.style.cursor=\'pointer\'" onmouseout="this.style.cursor=\'default\'" width="40" height="40" src="https://w7.pngwing.com/pngs/654/751/png-transparent-cache-android-google-play-android-emblem-trademark-logo-thumbnail.png" alt="удалить аккаунт"/>';
+                    newRow.appendChild(deleteCell);
+                }
+            }
+            accountRequest.send();
+        }
+    </script>
 </body>
 </html>
